@@ -146,3 +146,7 @@ logs/
 wandb/
 .env
 .autoenv
+
+# dataset
+earningscall
+sec-edgar-filings
