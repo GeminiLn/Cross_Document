@@ -16,6 +16,9 @@ from transformers import AutoTokenizer, AutoModel
 import warnings
 warnings.filterwarnings("ignore")
 
+import logging
+logging.basicConfig(filename='logs/EarningsEmbedding.log', level=logging.INFO, format='%(asctime)s %(message)s')
+
 class Main_Dataset(Dataset):
     def __init__(self, encodings):
         self.encodings = encodings.to('cuda')
@@ -42,7 +45,9 @@ def bert_embedding(model, tokenizer, data):
 if __name__ == '__main__':
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    print('Using Device: ', torch.cuda.get_device_name(0))
+    logging.info('Using Device: %s', torch.cuda.get_device_name(0))
+    metadata = pd.read_csv('data/metadata/earningscall_list.csv')
+    metadata['embedding']  = 0
 
     model_type = "roberta-large"
     tokenizer = AutoTokenizer.from_pretrained(model_type)
@@ -50,20 +55,33 @@ if __name__ == '__main__':
     model.to('cuda')
 
     file_num = len(os.listdir('data/earningscall/transcripts/'))
-    print('Total number of files to be processed: ', file_num)
+    logging.info('Total number of files to be processed: %s', file_num)
 
     countn = 0
     for file in os.listdir('data/earningscall/transcripts/'):
         data = pd.read_feather('data/earningscall/transcripts/' + file)
+        transcriptid = int(file.split('.')[0])
+        transcript_index = metadata[metadata['transcriptid'] == transcriptid].index.values[0]
         
         embedding_dict = {}
-        for i in range(data.shape[0]):
-            sentence_list = data['componenttext'][i].split('. ')
-            embedding = bert_embedding(model, tokenizer, sentence_list)
-            embedding_dict[int(data['transcriptcomponentid'][i])] = embedding
+        try:
+            for i in range(data.shape[0]):
+                sentence_list = data['componenttext'][i].split('. ')
+                embedding = bert_embedding(model, tokenizer, sentence_list)
+                embedding_dict[int(data['transcriptcomponentid'][i])] = embedding
+            
+            with open('data/earningscall/embeddings/' + file.split('.')[0] + '_embedding.json', 'w') as f:
+                json.dump(embedding_dict, f)
+            
+            logging.info('Processed file: %s', file)
+            metadata['embedding'][transcript_index] = 1
 
-        with open('data/earningscall/embeddings/' + file.split('.')[0] + '_embedding.json', 'w') as f:
-            json.dump(embedding_dict, f)
+        except:
+            logging.error('Error in file: %s', file)
+            metadata['embedding'][transcript_index] = -1
         
         countn += 1
-        print('Processing progress: ', countn / file_num * 100, '%')
+        logging.info('Processing progress: %s %s', countn / file_num * 100, '%')
+
+        if countn % 100 == 0:
+            metadata.to_csv('data/metadata/earningscall_list_embedding.csv', index=False)
