@@ -46,13 +46,14 @@ if __name__ == '__main__':
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     logging.info('Using Device: %s', torch.cuda.get_device_name(0))
-    metadata = pd.read_csv('data/metadata/earningscall_list.csv')
-    metadata['embedding']  = 0
 
     model_type = "roberta-large"
     tokenizer = AutoTokenizer.from_pretrained(model_type)
     model = AutoModel.from_pretrained(model_type)
     model.to('cuda')
+
+    metadata = pd.read_csv('data/metadata/earningscall_list.csv')
+    metadata['embedding']  = 0
 
     file_num = len(os.listdir('data/earningscall/transcripts/'))
     logging.info('Total number of files to be processed: %s', file_num)

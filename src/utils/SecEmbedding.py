@@ -6,6 +6,8 @@
 ### This file contains utility function that generate sentence embeddings for SEC 10-K and 10-Q reports.
 
 import sys
+
+from importlib_metadata import metadata
 sys.path.append(r'src/utils/')
 
 import numpy as np
@@ -54,20 +56,26 @@ def bert_embedding(model, tokenizer, data_dict):
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    print('Using Device: ', torch.cuda.get_device_name(0))
+    os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+    logging.info('Using Device: %s', torch.cuda.get_device_name(0))
 
     model_type = "roberta-large"
     tokenizer = AutoTokenizer.from_pretrained(model_type)
     model = AutoModel.from_pretrained(model_type)
     model.to('cuda')
 
+    metadata_10k = pd.read_csv('data/metadata/10K_list.csv')
+    metadata_10k['embedding']  = 0
+    metadata_10q = pd.read_csv('data/metadata/10Q_list.csv')
+    metadata_10q['embedding']  = 0
+
     file_num = len(os.listdir('data/sec-edgar-filings/reports/'))
-    print('Total number of files to be processed: ', file_num)
+    logging.info('Total number of files to be processed: %s', file_num)
 
     countn = 0
     for comp in os.listdir('data/sec-edgar-filings/reports/'):
 
+        logging.info('Processing company %s', comp)
 
         os.makedirs('data/sec-edgar-filings/embeddings/' + comp, exist_ok=True)
         os.makedirs('data/sec-edgar-filings/embeddings/' + comp + '/10-K', exist_ok=True)
@@ -76,22 +84,48 @@ if __name__ == '__main__':
         # 10-K
         for file in os.listdir(f'data/sec-edgar-filings/reports/{comp}/10-K/'):
             file_path = os.path.join(f'data/sec-edgar-filings/reports/{comp}/10-K/', file, 'full-submission.txt')
-            data_dict = Parse_10k(file_path)
-            embedding_dict = bert_embedding(model, tokenizer, data_dict)
-            torch.cuda.empty_cache()
+            reportid = file
+            report_index = metadata_10k.index[metadata_10k['accessNumber'] == reportid].index.values[0]
 
-            with open(f'data/sec-edgar-filings/embeddings/{comp}/10-K/{file}.json', 'w') as f:
-                json.dump(embedding_dict, f)
+            try:
+                data_dict = Parse_10k(file_path)
+                embedding_dict = bert_embedding(model, tokenizer, data_dict)
+                torch.cuda.empty_cache()
+
+                with open(f'data/sec-edgar-filings/embeddings/{comp}/10-K/{file}.json', 'w') as f:
+                    json.dump(embedding_dict, f)
+                
+                logging.info('Processed file: %s', file)
+                metadata_10k['embedding'][report_index] = 1
+            
+            except:
+                logging.info('Error in file: %s', file)
+                metadata_10k['embedding'][report_index] = -1
+        
+        metadata_10k.to_csv('data/metadata/10K_list_embedding.csv', index=False)
         
         # 10-Q
         for file in os.listdir(f'data/sec-edgar-filings/reports/{comp}/10-Q/'):
             file_path = os.path.join(f'data/sec-edgar-filings/reports/{comp}/10-Q/', file, 'full-submission.txt')
-            data_dict = Parse_10q(file_path)
-            embedding_dict = bert_embedding(model, tokenizer, data_dict)
-            torch.cuda.empty_cache()
+            reportid = file
+            report_index = metadata_10q.index[metadata_10q['accessNumber'] == reportid].index.values[0]
 
-            with open(f'data/sec-edgar-filings/embeddings/{comp}/10-Q/{file}.json', 'w') as f:
-                json.dump(embedding_dict, f)
+            try:
+                data_dict = Parse_10q(file_path)
+                embedding_dict = bert_embedding(model, tokenizer, data_dict)
+                torch.cuda.empty_cache()
+
+                with open(f'data/sec-edgar-filings/embeddings/{comp}/10-Q/{file}.json', 'w') as f:
+                    json.dump(embedding_dict, f)
+                
+                logging.info('Processed file: %s', file)
+                metadata_10q['embedding'][report_index] = 1
+            
+            except:
+                logging.info('Error in file: %s', file)
+                metadata_10q['embedding'][report_index] = -1
+        
+        metadata_10q.to_csv('data/metadata/10Q_list_embedding.csv', index=False)
         
         countn += 1
-        print('Processing progress: ', countn / file_num * 100, '%')
+        logging.info('Processing progress: %s %s', countn / file_num * 100, '%')
