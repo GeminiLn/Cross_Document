@@ -13,6 +13,9 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer, AutoModel
 
+import warnings
+warnings.filterwarnings("ignore")
+
 class Main_Dataset(Dataset):
     def __init__(self, encodings):
         self.encodings = encodings.to('cuda')
@@ -38,13 +41,20 @@ def bert_embedding(model, tokenizer, data):
 
 if __name__ == '__main__':
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    print('Using Device: ', torch.cuda.get_device_name(0))
+
     model_type = "roberta-large"
     tokenizer = AutoTokenizer.from_pretrained(model_type)
     model = AutoModel.from_pretrained(model_type)
     model.to('cuda')
 
-    for file in os.listdir('../data/earningscall/transcripts/'):
-        data = pd.read_feather('../data/earningscall/transcripts/' + file)
+    file_num = len(os.listdir('data/earningscall/transcripts/'))
+    print('Total number of files to be processed: ', file_num)
+
+    countn = 0
+    for file in os.listdir('data/earningscall/transcripts/'):
+        data = pd.read_feather('data/earningscall/transcripts/' + file)
         
         embedding_dict = {}
         for i in range(data.shape[0]):
@@ -52,5 +62,8 @@ if __name__ == '__main__':
             embedding = bert_embedding(model, tokenizer, sentence_list)
             embedding_dict[int(data['transcriptcomponentid'][i])] = embedding
 
-        with open('../data/earningscall/embeddings/' + file.split('.')[0] + '_embedding.json', 'w') as f:
+        with open('data/earningscall/embeddings/' + file.split('.')[0] + '_embedding.json', 'w') as f:
             json.dump(embedding_dict, f)
+        
+        countn += 1
+        print('Processing progress: ', countn / file_num * 100, '%')
