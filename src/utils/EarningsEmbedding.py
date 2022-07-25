@@ -50,7 +50,7 @@ if __name__ == '__main__':
     model_type = "roberta-large"
     tokenizer = AutoTokenizer.from_pretrained(model_type)
     model = AutoModel.from_pretrained(model_type)
-    model.to('cuda')
+    model.cuda()
 
     metadata = pd.read_csv('data/metadata/earningscall_list.csv')
     metadata['embedding']  = 0

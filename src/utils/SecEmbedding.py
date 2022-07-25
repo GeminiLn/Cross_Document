@@ -56,13 +56,12 @@ def bert_embedding(model, tokenizer, data_dict):
 
 if __name__ == '__main__':
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "2"
     logging.info('Using Device: %s', torch.cuda.get_device_name(0))
 
     model_type = "roberta-large"
     tokenizer = AutoTokenizer.from_pretrained(model_type)
     model = AutoModel.from_pretrained(model_type)
-    model.to('cuda')
+    model.cuda()
 
     metadata_10k = pd.read_csv('data/metadata/10K_list.csv')
     metadata_10k['embedding']  = 0
@@ -80,12 +79,12 @@ if __name__ == '__main__':
         os.makedirs('data/sec-edgar-filings/embeddings/' + comp, exist_ok=True)
         os.makedirs('data/sec-edgar-filings/embeddings/' + comp + '/10-K', exist_ok=True)
         os.makedirs('data/sec-edgar-filings/embeddings/' + comp + '/10-Q', exist_ok=True)
-        
+
+        logging.info('Processing 10-K reports for company %s', comp)
         # 10-K
         for file in os.listdir(f'data/sec-edgar-filings/reports/{comp}/10-K/'):
             file_path = os.path.join(f'data/sec-edgar-filings/reports/{comp}/10-K/', file, 'full-submission.txt')
-            reportid = file
-            report_index = metadata_10k.index[metadata_10k['accessNumber'] == reportid].index.values[0]
+            report_index = metadata_10k[metadata_10k['accessNumber'] == file].index.values[0]
 
             try:
                 data_dict = Parse_10k(file_path)
@@ -103,13 +102,13 @@ if __name__ == '__main__':
                 metadata_10k['embedding'][report_index] = -1
         
         metadata_10k.to_csv('data/metadata/10K_list_embedding.csv', index=False)
-        
+
+        logging.info('Processing 10-Q reports for company %s', comp)
         # 10-Q
         for file in os.listdir(f'data/sec-edgar-filings/reports/{comp}/10-Q/'):
             file_path = os.path.join(f'data/sec-edgar-filings/reports/{comp}/10-Q/', file, 'full-submission.txt')
-            reportid = file
-            report_index = metadata_10q.index[metadata_10q['accessNumber'] == reportid].index.values[0]
-
+            report_index = metadata_10q[metadata_10q['accessNumber'] == file].index.values[0]
+            
             try:
                 data_dict = Parse_10q(file_path)
                 embedding_dict = bert_embedding(model, tokenizer, data_dict)
